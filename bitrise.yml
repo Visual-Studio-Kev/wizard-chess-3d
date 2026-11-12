@@ -77,3 +77,8 @@ workflows:
       bitrise.io:
         stack: osx-xcode-latest-stable
         machine_type_id: g2.mac.large
+    triggers:
+      pull_request:
+        - target_branch:
+            regex: .*
+          priority: 100
