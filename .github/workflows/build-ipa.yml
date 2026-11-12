@@ -1,48 +1,59 @@
-name: Build WizardChess3D.ipa
+name: Build iOS App (Capacitor)
 
 on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
-env:
-  APP_NAME: "Wizard Chess 3D"
-  APP_ID: "com.deadpeoples.wizardchess"
-  COPYRIGHT_TEXT: "© 2026 Dead Peoples INC."
-
 jobs:
-  build:
+  build-ios:
+    name: Budowanie aplikacji iOS
     runs-on: macos-latest
 
     steps:
-      - name: Pobranie kodu z repozytorium
+      - name: 1. Pobranie kodu z repozytorium
         uses: actions/checkout@v4
 
-      - name: Budowanie wersji webowej ze ścieżkami względnymi (Vite)
-        run: |
-          npm install
-          npx vite build --base=./
+      - name: 2. Konfiguracja środowiska Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Konfiguracja Capacitor i iOS (iPhone + iPad)
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/ios
-          npx cap init "$APP_NAME" "$APP_ID" --web-dir "dist"
-          npx cap add ios
+      - name: 3. Instalacja zależności Node.js
+        run: npm ci
 
-      - name: Wpisanie praw autorskich Dead Peoples INC. do Info.plist
-        run: |
-          /usr/libexec/PlistBuddy -c "Add :NSHumanReadableCopyright string '$COPYRIGHT_TEXT'" ios/App/App/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :NSHumanReadableCopyright '$COPYRIGHT_TEXT'" ios/App/App/Info.plist
+      - name: 4. Budowanie aplikacji webowej
+        run: npm run build
 
-      - name: Generowanie ikony szachów (z assets/icon-only.png)
-        run: |
-          if [ -f "assets/icon-only.png" ]; then
-            npm install -D @capacitor/assets
-            npx capacitor-assets generate --ios
-          fi
-
-      - name: Synchronizacja plików z projektem iOS
+      - name: 5. Synchronizacja projektu Capacitor z iOS
         run: npx cap sync ios
 
-      - name: Kompilacja czystego .app bez podpisu kodu
+      - name: 6. Naprawa sum kontrolnych SPM (obejście błędu 8.6.1)
+        run: |
+          echo "Czyszczenie pamięci podręcznej Swift Package Manager..."
+          rm -rf ~/Library/Caches/org.swift.swiftpm
+          rm -rf build_data/SourcePackages
+          rm -f ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+          echo "Wymuszanie stabilnej wersji 8.6.0 w CapApp-SPM/Package.swift..."
+          if [ -f "ios/App/CapApp-SPM/Package.swift" ]; then
+            sed -i '' 's/exact: "8.6.1"/exact: "8.6.0"/g' ios/App/CapApp-SPM/Package.swift
+            sed -i '' 's/from: "8.6.1"/exact: "8.6.0"/g' ios/App/CapApp-SPM/Package.swift
+            sed -i '' 's/"8.6.1"/"8.6.0"/g' ios/App/CapApp-SPM/Package.swift
+            cat ios/App/CapApp-SPM/Package.swift
+          fi
+
+      - name: 7. Rozwiązanie zależności SPM
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -derivedDataPath build_data
+
+      - name: 8. Kompilacja aplikacji w Xcode (bez podpisywania)
         run: |
           xcodebuild -project ios/App/App.xcodeproj \
             -scheme App \
@@ -55,16 +66,15 @@ jobs:
             CODE_SIGN_ALLOWED=NO \
             AD_HOC_CODE_SIGNING_ALLOWED=NO
 
-      - name: Pakowanie do WizardChess3D.ipa i weryfikacja modeli 3D
+      - name: 9. Pakowanie niepodpisanego pliku .ipa
         run: |
-          mkdir -p out/Payload
-          cp -r build_data/Build/Products/Release-iphoneos/App.app out/Payload/
-          ls -la out/Payload/App.app/public/assets/glb/
-          cd out
-          zip -qry "WizardChess3D.ipa" Payload
+          mkdir -p Payload
+          cp -r build_data/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r App-unsigned.ipa Payload
 
-      - name: Udostępnienie gotowego pliku do pobrania
+      - name: 10. Wysłanie gotowego pliku .ipa jako artefakt
         uses: actions/upload-artifact@v4
         with:
-          name: WizardChess3D-IPA
-          path: out/WizardChess3D.ipa
+          name: ios-app-unsigned
+          path: App-unsigned.ipa
+          retention-days: 7
