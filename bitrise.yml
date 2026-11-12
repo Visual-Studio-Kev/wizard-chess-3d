@@ -18,10 +18,10 @@ workflows:
             - content: |-
                 #!/usr/bin/env bash
                 set -ex
-                
+
                 # Czysta instalacja zależności
                 npm install
-                
+
                 # Kompilacja webowa ze ścieżkami względnymi (zapobiega białemu ekranowi na iOS)
                 npx vite build --base=./
 
@@ -48,7 +48,7 @@ workflows:
             - content: |-
                 #!/usr/bin/env bash
                 set -ex
-                
+
                 # Bezpieczne ustawienie praw autorskich w Info.plist z użyciem zmiennej środowiskowej
                 PLIST_PATH="ios/App/App/Info.plist"
                 if /usr/libexec/PlistBuddy -c "Print :NSHumanReadableCopyright" "$PLIST_PATH" 2>/dev/null; then
@@ -72,7 +72,7 @@ workflows:
             - content: |-
                 #!/usr/bin/env bash
                 set -ex
-                
+
                 # Czyszczenie i kompilacja projektu Xcode z całkowitym pominięciem podpisywania
                 xcodebuild -project ios/App/App.xcodeproj \
                   -scheme App \
@@ -90,10 +90,14 @@ workflows:
                 cp -r build_data/Build/Products/Release-iphoneos/App.app out/Payload/
                 cd out
                 zip -qry "WizardChess3D.ipa" Payload
-                
+
                 # Archiwizacja do zip dla kroku deploy w Bitrise
                 zip -qry "$BITRISE_DEPLOY_DIR/WizardChess3D-ipa.zip" "WizardChess3D.ipa"
 
       - deploy-to-bitrise-io@2:
           inputs:
             - pipeline_intermediate_files: ""
+    meta:
+      bitrise.io:
+        stack: osx-xcode-latest-stable
+        machine_type_id: g2.mac.large
