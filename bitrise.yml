@@ -73,3 +73,7 @@ workflows:
       - deploy-to-bitrise-io@2:
           inputs:
             - pipeline_intermediate_files: ""
+    meta:
+      bitrise.io:
+        stack: osx-xcode-latest-stable
+        machine_type_id: g2.mac.large
