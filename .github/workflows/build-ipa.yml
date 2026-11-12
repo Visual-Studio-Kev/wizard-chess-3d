@@ -1,0 +1,85 @@
+name: Build Wizard Chess 3D (Unsigned IPA)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Pozwala uruchamiać ręcznie przyciskiem w przeglądarce
+
+env:
+  APP_NAME: "Wizard Chess 3D"
+  APP_ID: "com.deadpeoples.wizardchess"
+  COPYRIGHT_TEXT: "© 2026 Dead Peoples INC."
+
+jobs:
+  build-ios:
+    name: Kompilacja iOS / iPadOS (macOS Runner)
+    runs-on: macos-latest
+
+    steps:
+      - name: 1. Pobranie kodu z repozytorium
+        uses: actions/checkout@v4
+
+      - name: 2. Konfiguracja środowiska Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Budowanie aplikacji webowej i konfiguracja Capacitor 8.6.0
+        run: |
+          npm install
+          npx vite build --base=./
+
+          npm install @capacitor/core@8.6.0 @capacitor/cli@8.6.0 @capacitor/ios@8.6.0
+
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.deadpeoples.wizardchess",
+            "appName": "Wizard Chess 3D",
+            "webDir": "dist"
+          }
+          EOF
+
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+
+      - name: 4. Prawa autorskie Dead Peoples INC. oraz ikona aplikacji
+        run: |
+          PLIST_PATH="ios/App/App/Info.plist"
+          if /usr/libexec/PlistBuddy -c "Print :NSHumanReadableCopyright" "$PLIST_PATH" 2>/dev/null; then
+            /usr/libexec/PlistBuddy -c "Set :NSHumanReadableCopyright \"$COPYRIGHT_TEXT\"" "$PLIST_PATH"
+          else
+            /usr/libexec/PlistBuddy -c "Add :NSHumanReadableCopyright string \"$COPYRIGHT_TEXT\"" "$PLIST_PATH"
+          fi
+
+          if [ -f "assets/icon-only.png" ]; then
+            npm install -D @capacitor/assets
+            npx capacitor-assets generate --ios
+          fi
+
+          npx cap sync ios
+
+      - name: 5. Kompilacja czystego WizardChess3D.ipa (bez podpisu)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build_data \
+            clean build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_REQUIRED=NO \
+            CODE_SIGN_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=NO
+
+          mkdir -p out/Payload
+          cp -r build_data/Build/Products/Release-iphoneos/App.app out/Payload/
+          cd out
+          zip -qry "WizardChess3D.ipa" Payload
+
+      - name: 6. Udostępnienie gotowego pliku IPA do pobrania
+        uses: actions/upload-artifact@v4
+        with:
+          name: WizardChess3D-IPA
+          path: out/WizardChess3D.ipa
