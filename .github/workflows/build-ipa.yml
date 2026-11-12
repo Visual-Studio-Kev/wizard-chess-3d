@@ -29,10 +29,16 @@ jobs:
           npm install
           npx vite build --base=./
 
-      - name: 4. Inicjalizacja Capacitor i dodanie platformy iOS
+      - name: 4. Konfiguracja Capacitor (JSON) i dodanie platformy iOS
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/ios
-          npx cap init "$APP_NAME" "$APP_ID" --web-dir "dist"
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.deadpeoples.wizardchess",
+            "appName": "Wizard Chess 3D",
+            "webDir": "dist"
+          }
+          EOF
           npx cap add ios
 
       - name: 5. Wpisanie praw autorskich Dead Peoples INC. do Info.plist
