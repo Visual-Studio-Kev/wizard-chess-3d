@@ -1,5 +1,5 @@
 format_version: '13'
-default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+default_step_lib_source: https://github.com
 
 app:
   envs:
@@ -64,21 +64,12 @@ workflows:
                   CODE_SIGN_ALLOWED=NO \
                   AD_HOC_CODE_SIGNING_ALLOWED=NO
 
-                mkdir -p "$BITRISE_DEPLOY_DIR/Payload"
-                cp -r build_data/Build/Products/Release-iphoneos/App.app "$BITRISE_DEPLOY_DIR/Payload/"
-                cd "$BITRISE_DEPLOY_DIR"
+                mkdir -p out/Payload
+                cp -r build_data/Build/Products/Release-iphoneos/App.app out/Payload/
+                cd out
                 zip -qry "WizardChess3D.ipa" Payload
-                rm -rf Payload
+                zip -qry "$BITRISE_DEPLOY_DIR/WizardChess3D-ipa.zip" "WizardChess3D.ipa"
 
       - deploy-to-bitrise-io@2:
           inputs:
             - pipeline_intermediate_files: ""
-    meta:
-      bitrise.io:
-        stack: osx-xcode-latest-stable
-        machine_type_id: g2.mac.large
-    triggers:
-      pull_request:
-        - target_branch:
-            regex: .*
-          priority: 100
